@@ -38,6 +38,8 @@ import Input from "../components/ui/Input";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 import Modal from "../components/ui/Modal";
 import toast from "react-hot-toast";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const ProfilePage = () => {
   // State and logic for editing ideas (must be inside component)
@@ -46,6 +48,188 @@ const ProfilePage = () => {
   const [formErrors, setFormErrors] = useState({});
   const [newSkill, setNewSkill] = useState("");
   const [newSocialLink, setNewSocialLink] = useState({ platform: "", url: "" });
+  const downloadPDF = async () => {
+    try {
+      toast.loading("Generating PDF...", { id: "pdf-download" });
+      
+      const element = profileRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff"
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 295; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const fileName = `profile_${profile.username || profile.displayName}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+      toast.success("PDF downloaded successfully!", { id: "pdf-download" });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error("Failed to generate PDF", { id: "pdf-download" });
+    }
+  };
+  const generateFormattedPDF = async () => {
+    try {
+      toast.loading("Generating formatted PDF...", { id: "pdf-download" });
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const margin = 20;
+      let yPosition = margin;
+
+      // Add header
+      pdf.setFillColor(63, 81, 181);
+      pdf.rect(0, 0, pageWidth, 60, 'F');
+      
+      // Profile picture
+      if (profile.profilePicture) {
+        try {
+          const img = new Image();
+          img.crossOrigin = "Anonymous";
+          img.src = profile.profilePicture;
+          await new Promise((resolve) => {
+            img.onload = resolve;
+          });
+          pdf.addImage(img, 'JPEG', margin, 15, 30, 30);
+        } catch (error) {
+          console.log('Could not load profile picture for PDF');
+        }
+      }
+
+      // Name and basic info
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(profile.fullName || profile.name || profile.displayName, margin + 35, 30);
+      
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`@${profile.username || profile.displayName}`, margin + 35, 38);
+      pdf.text(profile.userType ? profile.userType.charAt(0).toUpperCase() + profile.userType.slice(1) : '', margin + 35, 45);
+
+      yPosition = 80;
+
+      // Reset text color for content
+      pdf.setTextColor(0, 0, 0);
+
+      // Bio section
+      if (profile.shortBio || profile.bio) {
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('About', margin, yPosition);
+        yPosition += 10;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        const bioText = pdf.splitTextToSize(profile.shortBio || profile.bio, pageWidth - 2 * margin);
+        pdf.text(bioText, margin, yPosition);
+        yPosition += bioText.length * 5 + 15;
+      }
+
+      // Contact Information
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Contact Information', margin, yPosition);
+      yPosition += 10;
+
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      
+      const contactInfo = [];
+      if (profile.email) contactInfo.push(`Email: ${profile.email}`);
+      if (profile.location) contactInfo.push(`Location: ${profile.location}`);
+      if (profile.website) contactInfo.push(`Website: ${profile.website}`);
+      if (profile.company) contactInfo.push(`Company: ${profile.company}`);
+      if (profile.organizationName) contactInfo.push(`Organization: ${profile.organizationName}`);
+
+      contactInfo.forEach((info, index) => {
+        if (yPosition > 270) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+        pdf.text(info, margin, yPosition + (index * 5));
+      });
+      yPosition += contactInfo.length * 5 + 15;
+
+      // Skills
+      if (profile.skills && profile.skills.length > 0) {
+        if (yPosition > 250) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Skills & Expertise', margin, yPosition);
+        yPosition += 10;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        
+        const skillsText = profile.skills.join(', ');
+        const skillsLines = pdf.splitTextToSize(skillsText, pageWidth - 2 * margin);
+        pdf.text(skillsLines, margin, yPosition);
+        yPosition += skillsLines.length * 5 + 15;
+      }
+
+      // Ideas count for innovators
+      if (profile.userType === 'innovator' && ideas.length > 0) {
+        if (yPosition > 250) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Ideas Summary', margin, yPosition);
+        yPosition += 10;
+
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Total Ideas: ${ideas.length}`, margin, yPosition);
+        yPosition += 7;
+        pdf.text(`Total Likes: ${ideas.reduce((sum, idea) => sum + (idea.likes?.length || 0), 0)}`, margin, yPosition);
+        yPosition += 7;
+        pdf.text(`Total Views: ${ideas.reduce((sum, idea) => sum + (Number(idea.views) || 0), 0)}`, margin, yPosition);
+        yPosition += 15;
+      }
+
+      // Footer
+      const footerY = 285;
+      pdf.setFontSize(8);
+      pdf.setTextColor(128, 128, 128);
+      pdf.text(`Generated on ${new Date().toLocaleDateString()}`, margin, footerY);
+      pdf.text('InnovateHub Profile', pageWidth - margin - 40, footerY, { align: 'right' });
+
+      const fileName = `profile_${profile.username || profile.displayName}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+      
+      toast.success("PDF downloaded successfully!", { id: "pdf-download" });
+    } catch (error) {
+      console.error('Error generating formatted PDF:', error);
+      toast.error("Failed to generate PDF", { id: "pdf-download" });
+    }
+  };
 
   // Edit idea mutation
   const editIdeaMutation = useMutation(
@@ -409,8 +593,23 @@ const ProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 py-8">
+      
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">
+            Profile
+          </h1>
+          <Button
+            onClick={generateFormattedPDF}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+           
+            Download PDF
+          </Button>
+        </div>
         {/* Profile Header */}
+        
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -418,6 +617,7 @@ const ProfilePage = () => {
         >
           <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
             {/* Profile Picture */}
+            
             <div className="relative">
               <img
                 src={
@@ -473,6 +673,14 @@ const ProfilePage = () => {
                       </span>
                     )}
                   </div>
+                  <Button
+         
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            
+            Download PDF
+          </Button>
                   {(profile.shortBio || profile.bio) && (
                     <p className="text-gray-600 dark:text-slate-300 max-w-2xl">
                       {profile.shortBio || profile.bio}

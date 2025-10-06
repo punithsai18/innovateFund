@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import jsPDF from "jspdf"; // <-- add this import at the top
 import {
   Heart,
   MessageSquare,
@@ -138,6 +139,72 @@ const IdeaDetailPage = () => {
       },
     }
   );
+  // Inside your component, add these new states:
+const [showReportModal, setShowReportModal] = useState(false);
+const [reportData, setReportData] = useState({
+  reason: "",
+  description: "",
+  severity: "Low",
+});
+
+// Function to handle PDF generation
+const handleDownloadReport = () => {
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text("Idea Report Form", 20, 20);
+
+  doc.setFontSize(12);
+  doc.text(`Idea Title: ${idea.title}`, 20, 40);
+  doc.text(`Reported By: ${user?.name || "Anonymous"}`, 20, 50);
+  doc.text(`Reason: ${reportData.reason}`, 20, 70);
+  doc.text(`Description:`, 20, 80);
+
+  // Wrap long text
+  const splitDescription = doc.splitTextToSize(reportData.description, 170);
+  doc.text(splitDescription, 20, 90);
+
+  doc.text(`Severity: ${reportData.severity}`, 20, 120);
+  doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 130);
+
+  doc.save(`${idea.title}_Report.pdf`);
+  toast.success("Report downloaded successfully!");
+  setShowReportModal(false);
+};
+// Function to download idea details as PDF
+const handleDownloadIdeaPDF = () => {
+  const doc = new jsPDF();
+
+  doc.setFontSize(18);
+  doc.text("Idea Details", 20, 20);
+
+  doc.setFontSize(12);
+  doc.text(`Title: ${idea.title}`, 20, 40);
+  doc.text(`Category: ${idea.category}`, 20, 50);
+  doc.text(`Stage: ${idea.stage}`, 20, 60);
+  doc.text(`Impact Score: ${idea.impactScore}`, 20, 70);
+  doc.text(`Funding Goal: ${formatCurrency(idea.fundingGoal)}`, 20, 80);
+  doc.text(`Current Funding: ${formatCurrency(idea.currentFunding)}`, 20, 90);
+
+  if (idea.tags?.length) {
+    doc.text(`Tags: ${idea.tags.join(", ")}`, 20, 100);
+  }
+
+  doc.text("Description:", 20, 115);
+  const splitDescription = doc.splitTextToSize(idea.description, 170);
+  doc.text(splitDescription, 20, 125);
+
+  if (idea.creator?.name)
+    doc.text(`Creator: ${idea.creator.name}`, 20, 160);
+
+  doc.text(`Date: ${new Date(idea.createdAt).toLocaleDateString()}`, 20, 170);
+
+  doc.save(`${idea.title}_Details.pdf`);
+  toast.success("Idea details downloaded as PDF!");
+};
+
+
+// Add this Report button in the Action Buttons section (where Like, Share, etc. are)
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-US", {
@@ -301,9 +368,152 @@ const IdeaDetailPage = () => {
                         <Calendar className="w-4 h-4 mr-1" />
                         {new Date(idea.createdAt).toLocaleDateString()}
                       </span>
+                      <Button
+  variant="outline"
+  onClick={() => setShowReportModal(true)}
+>
+  <Tag className="w-4 h-4 mr-2" />
+  Report
+</Button>
+
+// --- Now add the new Modal at the bottom, near other modals ---
+<Modal
+  isOpen={showReportModal}
+  onClose={() => setShowReportModal(false)}
+  title="Report This Idea"
+  size="md"
+>
+  <form
+    onSubmit={(e) => {
+      e.preventDefault();
+      handleDownloadReport();
+    }}
+    className="space-y-4"
+  >
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Reason for Report
+      </label>
+      <select
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        value={reportData.reason}
+        onChange={(e) =>
+          setReportData({ ...reportData, reason: e.target.value })
+        }
+        required
+      >
+        <option value="">Select a reason</option>
+        <option value="Inappropriate Content">Inappropriate Content</option>
+        <option value="Spam or Misleading">Spam or Misleading</option>
+        <option value="Copyright Violation">Copyright Violation</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Description
+      </label>
+      <textarea
+        rows="4"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        placeholder="Describe the issue..."
+        value={reportData.description}
+        onChange={(e) =>
+          setReportData({ ...reportData, description: e.target.value })
+        }
+        required
+      ></textarea>
+    </div>
+
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Severity
+      </label>
+      <select
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        value={reportData.severity}
+        onChange={(e) =>
+          setReportData({ ...reportData, severity: e.target.value })
+        }
+      >
+        <option value="Low">Low</option>
+        <option value="Medium">Medium</option>
+        <option value="High">High</option>
+      </select>
+    </div>
+
+    <div className="flex space-x-3 pt-4">
+      <Button
+        type="button"
+        variant="outline"
+        className="flex-1"
+        onClick={() => setShowReportModal(false)}
+      >
+        Cancel
+      </Button>
+      <Button
+        type="submit"
+        className="flex-1"
+      >
+        Download Report
+      </Button>
+    </div>
+  </form>
+</Modal>
                     </div>
                   </div>
                 </div>
+                <div className="flex items-center space-x-3 mb-6">
+
+                <Button variant="outline" onClick={handleDownloadIdeaPDF}>
+                  
+  <Star className="w-4 h-4 mr-2" />
+  PDF
+</Button>
+</div>
+<div className="flex items-center space-x-3 mb-6">
+  <Button
+    variant={isLiked ? "primary" : "outline"}
+    onClick={handleLike}
+    loading={likeMutation.isLoading}
+  >
+    <Heart
+      className={`w-4 h-4 mr-2 ${isLiked ? "fill-current" : ""}`}
+    />
+    {idea.likes?.length || 0}
+  </Button>
+
+  <Button variant="outline">
+    <Share2 className="w-4 h-4 mr-2" />
+    Share
+  </Button>
+
+  {/* 👇 New PDF Button */}
+  <Button variant="outline" onClick={handleDownloadIdeaPDF}>
+    <Star className="w-4 h-4 mr-2" />
+    PDF
+  </Button>
+
+  {user?.userType === "investor" && idea.creator && user._id !== idea.creator._id && (
+    <Button onClick={() => setShowInvestmentModal(true)}>
+      <DollarSign className="w-4 h-4 mr-2" />
+      Invest
+    </Button>
+  )}
+
+  {user?.userType === "innovator" && idea.creator && user._id !== idea.creator._id && (
+    <Button
+      variant="outline"
+      onClick={handleCollaboration}
+      loading={collaborationMutation.isLoading}
+    >
+      <UserPlus className="w-4 h-4 mr-2" />
+      Collaborate
+    </Button>
+  )}
+</div>
+
 
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-3 mb-6">
@@ -712,10 +922,16 @@ const IdeaDetailPage = () => {
                 {investmentAmount &&
                   formatCurrency(parseFloat(investmentAmount))}
               </Button>
+              
             </div>
           </form>
         </Modal>
       </div>
+       
+
+
+
+
   {/* Floating Ask AI Button */}
   <AIFloatingButton onClick={handleOpenAIAssistant} />
     </div>

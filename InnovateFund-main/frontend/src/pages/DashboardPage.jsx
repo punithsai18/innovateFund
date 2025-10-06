@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from "recharts";
+
+
+
 import { 
   TrendingUp, 
   Users, 
@@ -21,6 +35,7 @@ import { useQuery } from 'react-query'
 
 const DashboardPage = () => {
   const { user } = useAuth()
+  
 
   // Fetch user stats
   const { data: stats, isLoading: statsLoading } = useQuery(
@@ -28,6 +43,10 @@ const DashboardPage = () => {
     api.users.getStats,
     { enabled: !!user }
   )
+  const [showViewsChart, setShowViewsChart] = useState(false);
+const [viewsData, setViewsData] = useState([]);
+
+
 
   // Fetch recent ideas
   const { data: ideasData, isLoading: ideasLoading } = useQuery(
@@ -45,6 +64,10 @@ const DashboardPage = () => {
 
   const recentIdeas = ideasData?.data?.ideas || []
   const topInvestors = leaderboardData?.data?.investors || []
+  const [showIdeasChart, setShowIdeasChart] = useState(false);
+  //const [ideasData,setIdeasData] = useState([]);
+  const [ideasChartData, setIdeasChartData] = useState([]);
+
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
@@ -55,11 +78,18 @@ const DashboardPage = () => {
     }).format(amount)
   }
 
-  const StatCard = ({ title, value, icon: Icon, color, change }) => (
+  const StatCard = ({ title, value, icon: Icon, color,change, onClick }) => (
+    <motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  onClick={onClick}
+  className={`bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer`}
+>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+      
     >
       <div className="flex items-center justify-between">
         <div>
@@ -75,6 +105,7 @@ const DashboardPage = () => {
           <Icon className="w-6 h-6 text-white" />
         </div>
       </div>
+    </motion.div>
     </motion.div>
   )
 
@@ -174,12 +205,33 @@ const DashboardPage = () => {
           {user?.userType === 'innovator' ? (
             <>
               <StatCard
-                title="Total Ideas"
-                value={stats?.data?.stats?.totalIdeas || 0}
-                icon={Lightbulb}
-                color="bg-primary-500"
-                change={12}
+                 title="Total Ideas"
+  value={stats?.data?.stats?.totalIdeas || 0}
+  icon={Lightbulb}
+  color="bg-primary-500"
+  change={12}
+  onClick={() => {
+    setShowIdeasChart(true);
+    // Example data – replace with API if available
+    setIdeasChartData([
+      { month: "Jan", ideas: 2 },
+      { month: "Feb", ideas: 3 },
+      { month: "Mar", ideas: 5 },
+      { month: "Apr", ideas: 4 },
+      { month: "May", ideas: 6 },
+      { month: "Jun", ideas: 8 },
+      { month: "Jul", ideas: 10 },
+    ]);
+  }}
               />
+              <BarChart data={ideasChartData}>
+  <CartesianGrid strokeDasharray="3 3" />
+  <XAxis dataKey="month" />
+  <YAxis />
+  <Tooltip />
+  <Bar dataKey="ideas" fill="#10b981" barSize={40} />
+</BarChart>
+
               <StatCard
                 title="Total Funding"
                 value={formatCurrency(stats?.data?.stats?.totalFunding || 0)}
@@ -196,10 +248,22 @@ const DashboardPage = () => {
               />
               <StatCard
                 title="Total Views"
-                value={stats?.data?.stats?.totalViews || 0}
-                icon={Eye}
-                color="bg-blue-500"
-                change={22}
+  value={stats?.data?.stats?.totalViews || 0}
+  icon={Eye}
+  color="bg-blue-500"
+  change={22}
+  onClick={() => {
+    setShowViewsChart(true);
+    // Fetch or set demo data for views
+    setViewsData([
+      { month: 'Jan', views: 120 },
+      { month: 'Feb', views: 180 },
+      { month: 'Mar', views: 240 },
+      { month: 'Apr', views: 310 },
+      { month: 'May', views: 400 },
+      { month: 'Jun', views: 350 },
+    ]);
+  }}
               />
             </>
           ) : (
@@ -387,6 +451,70 @@ const DashboardPage = () => {
           </div>
         </div>
       </div>
+      {showViewsChart && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className="bg-white rounded-xl p-6 w-full max-w-lg shadow-lg relative"
+    >
+      <h2 className="text-xl font-semibold text-gray-900 mb-4">Views Overview</h2>
+
+      {/* Simple chart using Recharts */}
+      <div className="w-full h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={viewsData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="views" stroke="#2563eb" strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <button
+        onClick={() => setShowViewsChart(false)}
+        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+      >
+        ✕
+      </button>
+    </motion.div>
+  </div>
+)}
+{showIdeasChart && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className="bg-white rounded-xl p-6 w-full max-w-lg shadow-lg relative"
+    >
+      <h2 className="text-xl font-semibold text-gray-900 mb-4">Ideas Overview</h2>
+
+      {/* Ideas Chart */}
+      <div className="w-full h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={ideasData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="ideas" fill="#10b981" barSize={40} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <button
+        onClick={() => setShowIdeasChart(false)}
+        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+      >
+        ✕
+      </button>
+    </motion.div>
+  </div>
+)}
+
+
     </div>
   )
 }
